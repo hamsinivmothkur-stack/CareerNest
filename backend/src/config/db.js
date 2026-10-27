@@ -34,8 +34,10 @@ const connectDB = async () => {
       });
       console.log(`[Database] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
       isConnecting = false;
+      global.dbLastError = null;
       return conn;
     } catch (err) {
+      global.dbLastError = `${err.name}: ${err.message}`;
       console.warn(`[Database] Connection format failed (${err.message}). Trying fallback...`);
     }
   }

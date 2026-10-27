@@ -68,6 +68,7 @@ app.get('/api/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     dbHost: mongoose.connection.host || null,
+    lastDbError: global.dbLastError || null,
     error: connectError,
     environment: process.env.NODE_ENV || 'development',
   });
