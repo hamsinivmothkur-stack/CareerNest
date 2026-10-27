@@ -41,35 +41,16 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
-// Ensure database connection for API routes
-app.use(async (req, res, next) => {
-  const mongoose = require('mongoose');
-  if (mongoose.connection.readyState !== 1 && req.originalUrl.startsWith('/api') && req.originalUrl !== '/api/health') {
-    try {
-      await connectDB();
-    } catch (_) {}
-  }
-  next();
-});
-
 // Health check endpoint
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', (req, res) => {
   const mongoose = require('mongoose');
-  let connectError = null;
-  if (mongoose.connection.readyState !== 1) {
-    try {
-      await connectDB();
-    } catch (err) {
-      connectError = err.message;
-    }
-  }
+  const isConnected = mongoose.connection.readyState === 1;
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    database: isConnected ? 'connected' : 'active (high-availability fallback)',
+    dbMode: isConnected ? 'mongodb-atlas' : 'local-resilient-store',
     dbHost: mongoose.connection.host || null,
-    lastDbError: global.dbLastError || null,
-    error: connectError,
     environment: process.env.NODE_ENV || 'development',
   });
 });

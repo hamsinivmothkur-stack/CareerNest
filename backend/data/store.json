@@ -1,0 +1,30 @@
+{
+  "users": [
+    {
+      "_id": "cebc09c36e0237fed8720cf1",
+      "name": "Demo Student",
+      "email": "demo@careernest.io",
+      "password": "$2a$10$cLbTtCMKOBnnlHA84wFedufkz1jLpH/loxunB9PdS4.5VkBaak.kS",
+      "createdAt": "2026-10-27T16:04:51.905Z",
+      "updatedAt": "2026-10-27T16:04:51.907Z"
+    }
+  ],
+  "applications": [
+    {
+      "_id": "9b5a5a5a278d62c904f39970",
+      "user": "cebc09c36e0237fed8720cf1",
+      "company": "Google",
+      "role": "SWE Intern",
+      "applicationUrl": "",
+      "location": "Remote",
+      "salary": "",
+      "dateApplied": "2026-10-27T16:04:52.037Z",
+      "deadline": null,
+      "status": "Applied",
+      "notes": "",
+      "interviewDate": null,
+      "createdAt": "2026-10-27T16:04:52.037Z",
+      "updatedAt": "2026-10-27T16:04:52.037Z"
+    }
+  ]
+}

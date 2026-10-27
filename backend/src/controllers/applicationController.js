@@ -1,4 +1,8 @@
+const mongoose = require('mongoose');
 const Application = require('../models/Application');
+const FallbackStore = require('../services/fallbackStore');
+
+const isDbConnected = () => mongoose.connection.readyState === 1;
 
 // @desc    Get all applications for logged-in user with search, filter, and sorting
 // @route   GET /api/applications
@@ -6,6 +10,15 @@ const Application = require('../models/Application');
 const getApplications = async (req, res, next) => {
   try {
     const { search, status, sort } = req.query;
+
+    if (!isDbConnected()) {
+      const applications = await FallbackStore.getApplications(req.user._id, { search, status, sort });
+      return res.status(200).json({
+        success: true,
+        count: applications.length,
+        applications,
+      });
+    }
 
     // Strict user data isolation
     const query = { user: req.user._id };
@@ -54,6 +67,20 @@ const getApplications = async (req, res, next) => {
 // @access  Private
 const getApplicationById = async (req, res, next) => {
   try {
+    if (!isDbConnected()) {
+      const application = await FallbackStore.getApplicationById(req.params.id, req.user._id);
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found or unauthorized access',
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        application,
+      });
+    }
+
     const application = await Application.findOne({
       _id: req.params.id,
       user: req.user._id,
@@ -107,11 +134,20 @@ const createApplication = async (req, res, next) => {
       });
     }
 
-const parseDate = (val) => {
-  if (!val) return null;
-  const d = new Date(val);
-  return isNaN(d.getTime()) ? null : d;
-};
+    const parseDate = (val) => {
+      if (!val) return null;
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    if (!isDbConnected()) {
+      const application = await FallbackStore.createApplication(req.user._id, req.body);
+      return res.status(201).json({
+        success: true,
+        message: 'Internship application created successfully',
+        application,
+      });
+    }
 
     const application = await Application.create({
       user: req.user._id,
@@ -126,7 +162,6 @@ const parseDate = (val) => {
       notes: notes ? notes.trim() : '',
       interviewDate: parseDate(interviewDate),
     });
-
 
     res.status(201).json({
       success: true,
@@ -143,6 +178,21 @@ const parseDate = (val) => {
 // @access  Private
 const updateApplication = async (req, res, next) => {
   try {
+    if (!isDbConnected()) {
+      const updated = await FallbackStore.updateApplication(req.params.id, req.user._id, req.body);
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found or unauthorized access',
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        message: 'Application updated successfully',
+        application: updated,
+      });
+    }
+
     let application = await Application.findOne({
       _id: req.params.id,
       user: req.user._id,
@@ -168,6 +218,12 @@ const updateApplication = async (req, res, next) => {
       interviewDate,
     } = req.body;
 
+    const parseDate = (val) => {
+      if (!val) return null;
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
     if (company !== undefined) application.company = company.trim();
     if (role !== undefined) application.role = role.trim();
     if (applicationUrl !== undefined) application.applicationUrl = applicationUrl.trim();
@@ -178,7 +234,6 @@ const updateApplication = async (req, res, next) => {
     if (status !== undefined) application.status = status;
     if (notes !== undefined) application.notes = notes.trim();
     if (interviewDate !== undefined) application.interviewDate = parseDate(interviewDate);
-
 
     const updatedApplication = await application.save();
 
@@ -204,6 +259,21 @@ const updateApplicationStatus = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: `Invalid status. Must be one of: ${allowed.join(', ')}`,
+      });
+    }
+
+    if (!isDbConnected()) {
+      const application = await FallbackStore.updateApplication(req.params.id, req.user._id, { status });
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found or unauthorized access',
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        message: `Status updated to ${status}`,
+        application,
       });
     }
 
@@ -235,6 +305,21 @@ const updateApplicationStatus = async (req, res, next) => {
 // @access  Private
 const deleteApplication = async (req, res, next) => {
   try {
+    if (!isDbConnected()) {
+      const deleted = await FallbackStore.deleteApplication(req.params.id, req.user._id);
+      if (!deleted) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found or unauthorized access',
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        message: 'Application deleted successfully',
+        id: req.params.id,
+      });
+    }
+
     const application = await Application.findOneAndDelete({
       _id: req.params.id,
       user: req.user._id,
@@ -264,6 +349,25 @@ const getDashboardStats = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
+    if (!isDbConnected()) {
+      const stats = await FallbackStore.getStats(userId);
+      const allApps = await FallbackStore.getApplications(userId, {});
+      return res.status(200).json({
+        success: true,
+        stats: {
+          totalApplications: stats.total,
+          inProgress: stats.inProgress,
+          interviewsScheduled: stats.interview,
+          offersReceived: stats.offer,
+          rejectedCount: stats.rejected,
+          overdueCount: 0,
+          upcomingDeadlines: allApps.filter((a) => a.deadline).slice(0, 5),
+          statusCounts: stats.byStatus,
+          recentActivity: allApps.slice(0, 5),
+        },
+      });
+    }
+
     const allApps = await Application.find({ user: userId }).sort({ updatedAt: -1 });
 
     const totalApplications = allApps.length;
@@ -276,7 +380,6 @@ const getDashboardStats = async (req, res, next) => {
     const offersReceived = allApps.filter((a) => a.status === 'Offer').length;
     const rejectedCount = allApps.filter((a) => a.status === 'Rejected').length;
 
-    // Upcoming deadlines calculation (next 14 days)
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
@@ -289,7 +392,6 @@ const getDashboardStats = async (req, res, next) => {
       (a) => a.deadline && new Date(a.deadline) < now && a.status !== 'Offer' && a.status !== 'Rejected'
     ).length;
 
-    // Breakdown by status
     const statusCounts = {
       Applied: allApps.filter((a) => a.status === 'Applied').length,
       Assessment: allApps.filter((a) => a.status === 'Assessment').length,
@@ -298,7 +400,6 @@ const getDashboardStats = async (req, res, next) => {
       Rejected: rejectedCount,
     };
 
-    // Recent 5 activity items
     const recentActivity = allApps.slice(0, 5);
 
     res.status(200).json({

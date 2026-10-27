@@ -15,7 +15,14 @@ const protect = async (req, res, next) => {
         process.env.JWT_SECRET || 'super_secret_careernest_jwt_key_2026_student_project'
       );
 
-      const user = await User.findById(decoded.id).select('-password');
+      let user = null;
+      if (require('mongoose').connection.readyState === 1) {
+        user = await User.findById(decoded.id).select('-password');
+      } else {
+        const FallbackStore = require('../services/fallbackStore');
+        user = await FallbackStore.findUserById(decoded.id);
+      }
+
       if (!user) {
         return res.status(401).json({
           success: false,

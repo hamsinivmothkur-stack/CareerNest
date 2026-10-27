@@ -1,5 +1,9 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const FallbackStore = require('../services/fallbackStore');
+
+const isDbConnected = () => mongoose.connection.readyState === 1;
 
 const generateToken = (id) => {
   return jwt.sign(
@@ -27,6 +31,29 @@ const registerUser = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Password must be at least 6 characters long',
+      });
+    }
+
+    if (!isDbConnected()) {
+      const userExists = await FallbackStore.findUserByEmail(email);
+      if (userExists) {
+        return res.status(400).json({
+          success: false,
+          message: 'An account with this email address already exists. Please log in.',
+        });
+      }
+      const user = await FallbackStore.createUser({ name, email, password });
+      const token = generateToken(user._id);
+      return res.status(201).json({
+        success: true,
+        message: 'Account registered successfully',
+        token,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          createdAt: user.createdAt,
+        },
       });
     }
 
@@ -78,6 +105,38 @@ const loginUser = async (req, res, next) => {
       });
     }
 
+    if (!isDbConnected()) {
+      const user = await FallbackStore.findUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials. User with this email was not found.',
+        });
+      }
+
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid credentials. The password you entered is incorrect.',
+        });
+      }
+
+      const token = generateToken(user._id);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Logged in successfully',
+        token,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          createdAt: user.createdAt,
+        },
+      });
+    }
+
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(401).json({
@@ -117,6 +176,25 @@ const loginUser = async (req, res, next) => {
 // @access  Private
 const getMe = async (req, res, next) => {
   try {
+    if (!isDbConnected()) {
+      const user = await FallbackStore.findUserById(req.user._id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found',
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          createdAt: user.createdAt,
+        },
+      });
+    }
+
     const user = await User.findById(req.user._id).select('-password');
     res.status(200).json({
       success: true,
