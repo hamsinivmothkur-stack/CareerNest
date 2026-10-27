@@ -74,6 +74,46 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+// Network diagnostic endpoint to pinpoint connection barriers
+app.get('/api/diag', async (req, res) => {
+  const dns = require('dns').promises;
+  const net = require('net');
+  const results = { timestamp: new Date().toISOString() };
+
+  try {
+    results.srv = await dns.resolveSrv('_mongodb._tcp.cluster0.ujzqwog.mongodb.net');
+  } catch (e) {
+    results.srvError = `${e.code || ''}: ${e.message}`;
+  }
+
+  try {
+    results.host = await dns.lookup('ac-iaiuswe-shard-00-00.ujzqwog.mongodb.net');
+  } catch (e) {
+    results.hostError = `${e.code || ''}: ${e.message}`;
+  }
+
+  if (results.host && results.host.address) {
+    results.tcpPort27017 = await new Promise((resolve) => {
+      const socket = new net.Socket();
+      socket.setTimeout(4000);
+      socket.connect(27017, results.host.address, () => {
+        socket.destroy();
+        resolve('SUCCESS: TCP connection to Atlas port 27017 established');
+      });
+      socket.on('error', (err) => resolve(`TCP_ERROR: ${err.message}`));
+      socket.on('timeout', () => {
+        socket.destroy();
+        resolve('TIMEOUT: Atlas dropped/blocked TCP packet (IP whitelist blocking)');
+      });
+    });
+  }
+
+  results.hasEnvMongoUri = Boolean(process.env.MONGO_URI);
+  results.hasEnvMongodbUri = Boolean(process.env.MONGODB_URI);
+
+  res.json(results);
+});
+
 // Mount Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/applications', require('./routes/applicationRoutes'));
