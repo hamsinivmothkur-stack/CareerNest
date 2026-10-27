@@ -56,7 +56,28 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/applications', require('./routes/applicationRoutes'));
 
-// 404 Handler for undefined routes
+// Serve static frontend files (if built in backend/public or frontend/dist)
+const path = require('path');
+const fs = require('fs');
+
+const publicPath = path.resolve(__dirname, '../public');
+const distPath = path.resolve(__dirname, '../../frontend/dist');
+const staticPath = fs.existsSync(publicPath) ? publicPath : (fs.existsSync(distPath) ? distPath : null);
+
+if (staticPath) {
+  console.log(`[CareerNest Server] Serving frontend static files from: ${staticPath}`);
+  app.use(express.static(staticPath));
+
+  // Client-side SPA routing: send index.html for non-API GET requests
+  app.get('*', (req, res, next) => {
+    if (req.originalUrl.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(staticPath, 'index.html'));
+  });
+}
+
+// 404 Handler for undefined API routes
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,

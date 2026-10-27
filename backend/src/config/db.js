@@ -1,13 +1,21 @@
 
+const dns = require('dns');
 const mongoose = require('mongoose');
 
-const connectDB = async () => {
-  const primaryUri = process.env.MONGO_URI || process.env.MONGODB_URI;
-
-  if (!primaryUri) {
-    console.error('[Database Error] MONGO_URI is not configured in environment variables.');
-    return null;
+// Configure public DNS resolution for Atlas mongodb+srv URIs
+if (dns && typeof dns.setServers === 'function') {
+  try {
+    dns.setServers(['8.8.8.8', '1.1.1.1']);
+  } catch (err) {
+    console.warn('[Database] Could not set custom DNS servers:', err.message);
   }
+}
+
+const connectDB = async () => {
+  const primaryUri =
+    process.env.MONGO_URI ||
+    process.env.MONGODB_URI ||
+    'mongodb+srv://hamsinivmothkur_db_user:sB185nT3VWhW3Jkc@cluster0.ujzqwog.mongodb.net/careernest?retryWrites=true&w=majority';
 
   try {
     const conn = await mongoose.connect(primaryUri, {

@@ -4,6 +4,8 @@
   "description": "CareerNest — Internship Application Tracker (MERN Stack End-Term Project)",
   "scripts": {
     "start": "node backend/src/index.js",
+    "build": "cd backend && npm install && cd ../frontend && npm install && npm run build && cd .. && node -e \"const fs=require('fs'); fs.rmSync('backend/public', {recursive:true,force:true}); fs.cpSync('frontend/dist', 'backend/public', {recursive:true});\"",
+    "build:frontend": "cd frontend && npm run build && cd .. && node -e \"const fs=require('fs'); fs.rmSync('backend/public', {recursive:true,force:true}); fs.cpSync('frontend/dist', 'backend/public', {recursive:true});\"",
     "seed": "node backend/src/seed.js",
     "test:api": "node backend/test_e2e.js",
     "install:all": "cd backend && npm install && cd ../frontend && npm install",

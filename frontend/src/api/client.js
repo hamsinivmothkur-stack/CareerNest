@@ -1,9 +1,13 @@
-const RAW_BASE =
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  'https://careernest-3.onrender.com';
+const getApiBase = () => {
+  const envUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL;
+  if (envUrl && envUrl.trim()) {
+    const trimmed = envUrl.trim().replace(/\/+$/, '');
+    return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+  }
+  return '/api';
+};
 
-export const API_BASE = RAW_BASE.replace(/\/+$/, '') + (RAW_BASE.endsWith('/api') ? '' : '/api');
+export const API_BASE = getApiBase();
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('careernest_token') || localStorage.getItem('applytrack_token');
