@@ -82,6 +82,12 @@ app.get('/api/diag', async (req, res) => {
   const results = { timestamp: new Date().toISOString() };
 
   try {
+    results.renderPublicIp = await fetch('https://api.ipify.org?format=json').then(r => r.json()).then(d => d.ip);
+  } catch (e) {
+    results.renderPublicIpError = e.message;
+  }
+
+  try {
     results.srv = await dns.resolveSrv('_mongodb._tcp.cluster0.ujzqwog.mongodb.net');
   } catch (e) {
     results.srvError = `${e.code || ''}: ${e.message}`;
