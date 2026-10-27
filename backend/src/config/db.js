@@ -1,37 +1,54 @@
 
-const dns = require('dns');
 const mongoose = require('mongoose');
 
-// Configure public DNS resolution for Atlas mongodb+srv URIs
-if (dns && typeof dns.setServers === 'function') {
-  try {
-    dns.setServers(['8.8.8.8', '1.1.1.1']);
-  } catch (err) {
-    console.warn('[Database] Could not set custom DNS servers:', err.message);
-  }
-}
+const STANDARD_ATLAS_URI =
+  'mongodb://hamsinivmothkur_db_user:sB185nT3VWhW3Jkc@ac-iaiuswe-shard-00-00.ujzqwog.mongodb.net:27017,ac-iaiuswe-shard-00-01.ujzqwog.mongodb.net:27017,ac-iaiuswe-shard-00-02.ujzqwog.mongodb.net:27017/careernest?ssl=true&replicaSet=atlas-ov49f8-shard-0&authSource=admin&retryWrites=true&w=majority';
+
+const SRV_ATLAS_URI =
+  'mongodb+srv://hamsinivmothkur_db_user:sB185nT3VWhW3Jkc@cluster0.ujzqwog.mongodb.net/careernest?retryWrites=true&w=majority';
+
+let isConnecting = false;
 
 const connectDB = async () => {
-  const primaryUri =
-    process.env.MONGO_URI ||
-    process.env.MONGODB_URI ||
-    'mongodb+srv://hamsinivmothkur_db_user:sB185nT3VWhW3Jkc@cluster0.ujzqwog.mongodb.net/careernest?retryWrites=true&w=majority';
-
-  try {
-    const conn = await mongoose.connect(primaryUri, {
-      dbName: 'careernest',
-      serverSelectionTimeoutMS: 10000,
-    });
-
-    console.log(
-      `[Database] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`
-    );
-
-    return conn;
-  } catch (error) {
-    console.error(`[Database Error] MongoDB connection failed: ${error.message}`);
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+  if (isConnecting) {
     return null;
   }
+  isConnecting = true;
+
+  const envUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+  // Try standard direct replica set URI first on cloud hosts for maximum DNS compatibility
+  const urisToTry = [
+    STANDARD_ATLAS_URI,
+    envUri,
+    SRV_ATLAS_URI,
+  ].filter(Boolean);
+
+  for (const uri of urisToTry) {
+    try {
+      const conn = await mongoose.connect(uri, {
+        dbName: 'careernest',
+        serverSelectionTimeoutMS: 8000,
+      });
+      console.log(`[Database] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
+      isConnecting = false;
+      return conn;
+    } catch (err) {
+      console.warn(`[Database] Connection format failed (${err.message}). Trying fallback...`);
+    }
+  }
+
+  isConnecting = false;
+  console.error('[Database Error] All MongoDB connection attempts failed.');
+  return null;
 };
+
+// Reconnect on disconnect
+mongoose.connection.on('disconnected', () => {
+  console.warn('[Database] MongoDB disconnected. Scheduling reconnection in 5s...');
+  setTimeout(connectDB, 5000);
+});
 
 module.exports = connectDB;

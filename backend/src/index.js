@@ -41,6 +41,17 @@ if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
 
+// Ensure database connection for API routes
+app.use(async (req, res, next) => {
+  const mongoose = require('mongoose');
+  if (mongoose.connection.readyState !== 1 && req.originalUrl.startsWith('/api') && req.originalUrl !== '/api/health') {
+    try {
+      await connectDB();
+    } catch (_) {}
+  }
+  next();
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   const mongoose = require('mongoose');
