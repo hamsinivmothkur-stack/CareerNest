@@ -4,7 +4,12 @@ const getApiBase = () => {
     const trimmed = envUrl.trim().replace(/\/+$/, '');
     return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
   }
-  return '/api';
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    if (window.location.origin.includes('careernest-3.onrender.com')) {
+      return '/api';
+    }
+  }
+  return 'https://careernest-3.onrender.com/api';
 };
 
 export const API_BASE = getApiBase();
