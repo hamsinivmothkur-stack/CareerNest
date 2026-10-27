@@ -1,4 +1,9 @@
-const API_BASE = '/api';
+const RAW_BASE =
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_API_BASE_URL ||
+  'https://careernest-3.onrender.com';
+
+export const API_BASE = RAW_BASE.replace(/\/+$/, '') + (RAW_BASE.endsWith('/api') ? '' : '/api');
 
 const getAuthHeaders = () => {
   const token = localStorage.getItem('careernest_token') || localStorage.getItem('applytrack_token');
