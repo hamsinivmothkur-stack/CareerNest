@@ -78,6 +78,7 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/diag', async (req, res) => {
   const dns = require('dns').promises;
   const net = require('net');
+  const mongoose = require('mongoose');
   const results = { timestamp: new Date().toISOString() };
 
   try {
@@ -87,29 +88,29 @@ app.get('/api/diag', async (req, res) => {
   }
 
   try {
+    results.txt = await dns.resolveTxt('cluster0.ujzqwog.mongodb.net');
+  } catch (e) {
+    results.txtError = `${e.code || ''}: ${e.message}`;
+  }
+
+  try {
     results.host = await dns.lookup('ac-iaiuswe-shard-00-00.ujzqwog.mongodb.net');
   } catch (e) {
     results.hostError = `${e.code || ''}: ${e.message}`;
   }
 
-  if (results.host && results.host.address) {
-    results.tcpPort27017 = await new Promise((resolve) => {
-      const socket = new net.Socket();
-      socket.setTimeout(4000);
-      socket.connect(27017, results.host.address, () => {
-        socket.destroy();
-        resolve('SUCCESS: TCP connection to Atlas port 27017 established');
-      });
-      socket.on('error', (err) => resolve(`TCP_ERROR: ${err.message}`));
-      socket.on('timeout', () => {
-        socket.destroy();
-        resolve('TIMEOUT: Atlas dropped/blocked TCP packet (IP whitelist blocking)');
-      });
-    });
-  }
+  results.envMongodbUri = process.env.MONGODB_URI ? process.env.MONGODB_URI.replace(/:[^@]+@/, ':***@') : null;
+  results.envMongoUri = process.env.MONGO_URI ? process.env.MONGO_URI.replace(/:[^@]+@/, ':***@') : null;
 
-  results.hasEnvMongoUri = Boolean(process.env.MONGO_URI);
-  results.hasEnvMongodbUri = Boolean(process.env.MONGODB_URI);
+  // Test direct connect with new standalone mongoose connection
+  const srvUri = 'mongodb+srv://hamsinivmothkur_db_user:sB185nT3VWhW3Jkc@cluster0.ujzqwog.mongodb.net/careernest?retryWrites=true&w=majority';
+  try {
+    const testConn = await mongoose.createConnection(srvUri, { serverSelectionTimeoutMS: 5000 }).asPromise();
+    results.directSrvTest = `CONNECTED: host=${testConn.host}, db=${testConn.name}`;
+    await testConn.close();
+  } catch (e) {
+    results.directSrvTest = `FAILED: ${e.name}: ${e.message}`;
+  }
 
   res.json(results);
 });
